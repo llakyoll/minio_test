@@ -1,0 +1,55 @@
+services:
+
+  # ── Ana uygulama ──────────────────────────────────────────
+  app:
+    build: .
+    container_name: server_arch_app
+    env_file: .env
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - arch_net
+    volumes:
+      - .:/app          # geliştirme sırasında hot-reload için
+    restart: unless-stopped
+
+  # ── Mock API sunucu (test için) ───────────────────────────
+  mock_server:
+    build: .
+    container_name: server_arch_mock
+    command: python -m server_arch.mockServer.mock_server
+    ports:
+      - "8085:8085"
+    networks:
+      - arch_net
+    restart: unless-stopped
+
+  # ── MinIO ─────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: server_arch_minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"     # S3 API
+      - "9001:9001"     # Web arayüzü
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
+    volumes:
+      - minio_data:/data
+    networks:
+      - arch_net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  minio_data:
+
+networks:
+  arch_net:
+    driver: bridge
