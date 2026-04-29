@@ -1,51 +1,43 @@
-services:
+version: "3.9"
 
-  # ── Ana uygulama ──────────────────────────────────────────
+services:
   app:
     build: .
     container_name: server_arch_app
     env_file: .env
+    environment:
+      - GATEWAY_BASE=${GATEWAY_BASE}
+      - API_KEY=${API_KEY}
+      - BRANCH_ID=${BRANCH_ID}
     depends_on:
-      minio:
-        condition: service_healthy
+      - mock_server
+      - minio
     networks:
       - arch_net
-    volumes:
-      - .:/app          # geliştirme sırasında hot-reload için
-    restart: unless-stopped
 
-  # ── Mock API sunucu (test için) ───────────────────────────
   mock_server:
     build: .
-    container_name: server_arch_mock
+    container_name: mock_server
     command: python -m server_arch.mockServer.mock_server
     ports:
       - "8085:8085"
     networks:
       - arch_net
-    restart: unless-stopped
 
-  # ── MinIO ─────────────────────────────────────────────────
   minio:
     image: minio/minio:latest
-    container_name: server_arch_minio
+    container_name: minio
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000"     # S3 API
-      - "9001:9001"     # Web arayüzü
+      - "9000:9000"
+      - "9001:9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:-minioadmin123}
     volumes:
       - minio_data:/data
     networks:
       - arch_net
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
 
 volumes:
   minio_data:
